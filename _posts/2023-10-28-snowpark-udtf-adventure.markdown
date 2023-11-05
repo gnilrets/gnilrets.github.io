@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Snowpark UDTF Adventure"
-date:   2023-10-28 17:45:40 -0700
+date:   2023-10-28
 categories: python, snowpark, udtf
 ---
 
@@ -15,9 +15,13 @@ While I got it to work in the end, the number of hoops I had to jump through, un
 performance left me feeling a little underwhelmed with the tool.  I'm writing up this summary of my experience so that others
 may learn from it and to suggest ways that the experience might be improved.
 
-**Note**: All of the code examples here were developed and tested in [Hex](hex.tech), which is the best analyst tool.  You could probably do this with other tools, but why?  You may see some jinjafied SQL below when we mix Python and SQL code.
+**Note**: All of the code examples here were developed and tested in
+[Hex](hex.tech).  You may see some jinjafied SQL below when we mix
+Python and SQL code.
 
-**Disclaimer**: Obviously, this was my first dive into Snowpark and it is very probably I did something wrong or missed some key component that would have made all of this simpler.  If so, please let me know!
+**Disclaimer**: Obviously, this was my first dive into Snowpark and it
+is very probably I did something wrong or missed some key component
+that would have made all of this simpler.  If so, please let me know!
 
 
 ## Project goals
@@ -30,7 +34,7 @@ This seemed like a good use case for Snowpark because:
 df['x'].rolling(3).median()
 ```
 
-## Choose your own... wait, hold on
+## Seems easy... wait, hold on
 
 ### Roadblock: choosing the right kind of function
 The first thing I had to figure out when approaching this problem was how I would use Snowpark to calculate a rolling median.
@@ -39,7 +43,7 @@ they'd provide a similar level of functionality and extensibility as Pandas data
 are just a wrapper around SQL, so there's really nothing you can do with Snowpark dataframes that you can't just do with SQL.  Next, I
 looked at [User Defined Functions](https://docs.snowflake.com/en/developer-guide/udf/python/udf-python-introduction) (UDFs) and [User Defined Table Functions](https://docs.snowflake.com/en/developer-guide/udf/python/udf-python-tabular-functions) (UDTFs).  Both of these function types allow a user to write Python, register the Python with Snowpark, and execute it in a SQL query.  The main difference are:
 
-* UDFs are scalar functions.  They take one input (which can include multiple parameters) and return a single value.
+* UDFs are scalar functions.  They take one input record (which can include multiple parameters) and return a single value.
 * UDTFs can operate on multiple records at once and can return multiple records.
 
 While a rolling median function does not require us to change the number of rows that are sent to the function, it does require processing multiple
