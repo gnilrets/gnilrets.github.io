@@ -7,26 +7,16 @@ categories: python, snowpark, udtf
 
 ## Introduction
 
-Last year, I got really excited when Snowflake [announced Snowpark for Python](https://www.snowflake.com/blog/snowpark-python-innovation-available-all-snowflake-customers/).  I imagined being able to run arbitrary
-python code on a compute cluster with the low-maintenance ease and top-notch speed I've come to expect from Snowflake SQL.
-Since then, I've been on the lookout for projects that would allow me to utilize what sounds like such a tremendously
-useful resource.  I recently found a relatively simple but useful project that I felt would be a good use case and dove in.
-While I got it to work in the end, the number of hoops I had to jump through, unexpected gotchas, and somewhat dissappointing
-performance left me feeling a little underwhelmed with the tool.  I'm writing up this summary of my experience so that others
-may learn from it and to suggest ways that the experience might be improved.
+Last year, I got really excited when Snowflake [announced Snowpark for Python](https://www.snowflake.com/blog/snowpark-python-innovation-available-all-snowflake-customers/).  I imagined being able to run arbitrary python code on a compute cluster with the low-maintenance ease and top-notch speed I've come to expect from Snowflake SQL.  Since then, I've been on the lookout for projects that would allow me to utilize what sounds like such a tremendously useful resource.  I recently found a relatively simple but useful project that I felt would be a good use case and dove in.  While I got it to work in the end, the number of hoops I had to jump through, unexpected gotchas, and somewhat dissappointing performance left me feeling a little underwhelmed with the tool.  I'm writing up this summary of my experience so that others may learn from it and to suggest ways that the experience might be improved.
 
-**Note**: All of the code examples here were developed and tested in
-[Hex](hex.tech).  You may see some jinjafied SQL below when we mix
-Python and SQL code.
+**Note**: All of the code examples here were developed and tested in [Hex](hex.tech).  You may see some jinjafied SQL below when we mix Python and SQL code.
 
-**Disclaimer**: Obviously, this was my first dive into Snowpark and it
-is very probably I did something wrong or missed some key component
-that would have made all of this simpler.  If so, please let me know!
+**Disclaimer**: Obviously, this was my first dive into Snowpark and it is very probably I did something wrong or missed some key component that would have made all of this simpler.  If so, please let me know!
 
 
 ## Project goals
-The goal of my project was pretty simple: *create a Snowpark function that can calculate a rolling median over a large dataset*.
-This seemed like a good use case for Snowpark because:
+The goal of my project was pretty simple: *create a Snowpark function that can calculate a rolling median over a large dataset*.  This seemed like a good use case for Snowpark because:
+
 * Snowflake SQL does not have a rolling median function ([rolling mean](https://docs.snowflake.com/en/sql-reference/functions/avg): yes; [window median](https://docs.snowflake.com/en/sql-reference/functions/median): yes, but no median that supports a window frame).
 * The overall computation is not that difficult, [Pandas can do it with one line](https://pandas.pydata.org/docs/reference/api/pandas.core.window.rolling.Rolling.median.html):
 
@@ -37,23 +27,17 @@ df['x'].rolling(3).median()
 ## Seems easy... wait, hold on
 
 ### Roadblock: choosing the right kind of function
-The first thing I had to figure out when approaching this problem was how I would use Snowpark to calculate a rolling median.
-I briefly explored [Snowpark dataframes](https://docs.snowflake.com/en/developer-guide/snowpark/python/working-with-dataframes), thinking
-they'd provide a similar level of functionality and extensibility as Pandas dataframes.  However, it turns out that Snowpark dataframes
-are just a wrapper around SQL, so there's really nothing you can do with Snowpark dataframes that you can't just do with SQL.  Next, I
-looked at [User Defined Functions](https://docs.snowflake.com/en/developer-guide/udf/python/udf-python-introduction) (UDFs) and [User Defined Table Functions](https://docs.snowflake.com/en/developer-guide/udf/python/udf-python-tabular-functions) (UDTFs).  Both of these function types allow a user to write Python, register the Python with Snowpark, and execute it in a SQL query.  The main difference are:
+The first thing I had to figure out when approaching this problem was how I would use Snowpark to calculate a rolling median. I briefly explored [Snowpark dataframes](https://docs.snowflake.com/en/developer-guide/snowpark/python/working-with-dataframes), thinking they'd provide a similar level of functionality and extensibility as Pandas dataframes.  However, it turns out that Snowpark dataframes are just a wrapper around SQL, so there's really nothing you can do with Snowpark dataframes that you can't just do with SQL.  Next, I looked at [User Defined Functions](https://docs.snowflake.com/en/developer-guide/udf/python/udf-python-introduction) (UDFs) and [User Defined Table Functions](https://docs.snowflake.com/en/developer-guide/udf/python/udf-python-tabular-functions) (UDTFs).  Both of these function types allow a user to write Python, register the Python with Snowpark, and execute it in a SQL query.  The main difference are:
 
 * UDFs are scalar functions.  They take one input record (which can include multiple parameters) and return a single value.
 * UDTFs can operate on multiple records at once and can return multiple records.
 
-While a rolling median function does not require us to change the number of rows that are sent to the function, it does require processing multiple
-rows at once.  So a UDTF was the only choice here.  Furthermore, I wanted to make sure that my function could process an arbitrarily large number of records.  This required that the function be able to fit into the memory of a compute node.  To be able to fit into memory, the data would have to be partitioned, even if I just wanted to compute a rolling median over the last 5 records of a billion record dataset.  Snowpark UDTFs only support this kind of partitioning through a [vectorized UDTF](https://docs.snowflake.com/en/developer-guide/udf/python/udf-python-tabular-vectorized).
+While a rolling median function does not require us to change the number of rows that are sent to the function, it does require processing multiple rows at once.  So a UDTF was the only choice here.  Furthermore, I wanted to make sure that my function could process an arbitrarily large number of records.  This required that the function be able to fit into the memory of a compute node.  To be able to fit into memory, the data would have to be partitioned, even if I just wanted to compute a rolling median over the last 5 records of a billion record dataset.  Snowpark UDTFs only support this kind of partitioning through a [vectorized UDTF](https://docs.snowflake.com/en/developer-guide/udf/python/udf-python-tabular-vectorized).
 
 Choice: Vectorized UDTF.
 
 ### Roadblock: UDTFs don't return passthrough columns
-Great, so now I know a vectorized UDTF is the way to go.  In order to understand how vectorized UDTFs work, I wanted to write a really simple UDTF
-that did nothing more than add `1` to the input column.  Here's the function I wrote
+Great, so now I know a vectorized UDTF is the way to go.  In order to understand how vectorized UDTFs work, I wanted to write a really simple UDTF that did nothing more than add `1` to the input column.  Here's the function I wrote
 
 ```python
 # For brevity, I'm not going to show all of the imports required in subsequent code samples.
@@ -106,14 +90,14 @@ We get data like
 |   nan | nan |         21 |
 |   nan | nan |         31 |
 
-So both the index column and the input data goes away!  To some degree, I understand why this must be true, since the vectorized UDTF
-works on a partition level/not a row-level and can delete records or create them out of nothing, it wouldn't really know how to associate
-the input records with the outputs.  However, in this case I definitely want to keep my input records around!
+So both the index column and the input data goes away!  To some degree, I understand why this must be true, since the vectorized UDTF works on a partition level/not a row-level and can delete records or create them out of nothing, it wouldn't really know how to associate the input records with the outputs.  However, in this case I definitely want to keep my input records around!
 
 One solution might be to change my UDTF so that it accepts the `idx` column as an input, and then returns `idx`, `x`, and `plus_one`.  There are at least two issues with this, as we'll explore in the next two roadblocks.
 
 ### Roadblock: Lack of named parameters
+
 One issue, while minor, is very annoying: there is no way to define named parameters in a UDTF.  Not that big of a deal with just two inputs, but obviously as the number of inputs grows, this becomes more of a problem in that the SQL developer has to remember the precise order of the arguments.  Here's what I wish we could do:
+
 ```sql
 -- Does not work, but I wish it did
 from
