@@ -2,7 +2,7 @@
 layout: post
 title:  "Snowpark UDTF Adventure"
 date:   2023-10-28
-categories: python, snowpark, udtf
+tags: python snowpark udtf
 ---
 
 ## Introduction

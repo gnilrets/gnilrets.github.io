@@ -1,15 +1,8 @@
 ---
-title: "Modeling ragged time-varying hierarchies"
-description: "Learn how to maximize the utility of complex hierarchical data in your analytics warehouse."
-slug: modeling-ragged-time-varying-hierarchies
-
-authors: [sterling_paramore]
-
-tags: [analytics craft]
-hide_table_of_contents: false
-
-date: 2023-05-02
-is_featured: true
+layout: post
+title:  "Modeling ragged time-varying hierarchies"
+date:   2023-05-02
+tags:   data-modeling sql
 ---
 
 This article covers an approach to handling time-varying ragged hierarchies in a <Term id="dimensional-modeling">dimensional model</Term>.  These kinds of data structures are commonly found in manufacturing, where components of a product have both parents and children of arbitrary depth and those components may be replaced over the product's lifetime.  The strategy described here simplifies many common types of analytical and reporting queries.
